@@ -1,0 +1,123 @@
+#!/usr/bin/python3
+
+# This program displays a list of recent earthquakes.
+# Parses JSON API Endpoint from https://earthquake.usgs.gov once a minute
+# and displays the result as color coded list in the terminal.
+# Requires a terminal that supports 256 colors.
+
+# The colors correspond to the PAGER status (https://earthquake.usgs.gov/data/pager/background.php)
+# The suggested levels of response are:
+# no response needed -> green,
+# local/regional             -> yellow,
+# national                      -> orange
+# international              -> red
+
+from tabulate import tabulate
+import argparse
+import datetime
+import os
+import requests
+import time
+
+# site config
+sites = {
+    # last hour
+    'hour45': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_hour.geojson',
+    'hour25': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_hour.geojson',
+    'hour10': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/1.0_hour.geojson',
+    'all_hour': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson',
+    # last 24 hours
+    'day45': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson',
+    'day25': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson',
+    'day10': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/1.0_day.geojson',
+    'all_day': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson'
+}
+
+# returns a list of properties for one earthquake
+def get_earthquake(feature):
+    reset = '\033[0m'
+    properties = feature['properties']
+
+    # time is given in milliseconds since epoch
+    t = datetime.datetime.utcfromtimestamp(properties['time'] / 1000)
+    timestamp = t.strftime('%Y-%m-%d %H:%M:%S')
+
+    # colorize magnitude
+    magnitude = properties['mag']
+    magstr = '{:0.2f}'.format(magnitude)
+
+    if magnitude >= 8.5:
+        magnitude = '\033[38;5;201m' + magstr + reset
+    elif magnitude >= 7.5:
+        magnitude = '\033[38;5;001m' + magstr + reset
+    elif magnitude >= 6.5:
+        magnitude = '\033[38;5;196m' + magstr + reset
+    elif magnitude >= 5.5:
+        magnitude = '\033[38;5;202m' + magstr + reset
+    elif magnitude >= 4.5:
+        magnitude = '\033[38;5;226m' + magstr + reset
+    elif magnitude >= 3.5:
+        magnitude = '\033[38;5;216m' + magstr + reset
+    elif magnitude >= 2.5:
+        magnitude = '\033[38;5;033m' + magstr + reset
+    elif magnitude >= 1.5:
+        magnitude = '\033[38;5;006m' + magstr + reset
+    else:
+        magnitude = magstr
+
+    # alert is the PAGER status
+    if properties['alert']  == 'red':
+        alert = '\033[38;5;009m' + 'RED' + reset
+    elif properties['alert']  == 'orange':
+        alert = '\033[38;5;208m' + 'ORANGE' + reset
+    elif properties['alert']  == 'yellow':
+        alert = '\033[38;5;011m' + 'YELLOW' + reset
+    elif properties['alert']  == 'green':
+        alert = '\033[38;5;046m' + 'GREEN' + reset
+    else:
+        alert = '-'
+
+    return [timestamp,  magnitude,  properties['place'],  alert,  properties['url']]
+
+# prints the table of all earthquakes
+def print_table(url):
+    req = requests.get(url)
+    earthquakes = req.json()
+    os.system('clear')
+    print(earthquakes['metadata']['title'])
+    print(tabulate(list(map(get_earthquake,  earthquakes['features'])),  headers=['Time (UTC)',  'Mag',  'Location',  'PAGER',  'More info'],  floatfmt='.1f'))
+
+def main():
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--hour45', help='show earthquakes >= M4.5 of the last 60 minutes', action='store_true')
+    group.add_argument('--hour25', help='show earthquakes >= M2.5 of the last 60 minutes', action='store_true')
+    group.add_argument('--hour10', help='show earthquakes >= M1.0 of the last 60 minutes', action='store_true')
+    group.add_argument('--day45', help='show earthquakes >= M4.5 of the last 24 hours', action='store_true')
+    group.add_argument('--day25', help='show earthquakes >= M2.5 of the last 24 hours', action='store_true')
+    group.add_argument('--day10', help='show earthquakes >= M1.0 of the last 24 hours', action='store_true')
+    args = parser.parse_args()
+
+    if args.hour45:
+        site = sites['hour45']
+    elif args.hour25:
+        site = sites['hour25']
+    elif args.hour10:
+        site = sites['hour10']
+    elif args.day45:
+        site = sites['day45']
+    elif args.day25:
+        site = sites['day25']
+    elif args.day10:
+        site = sites['day10']
+    while (True):
+        try:
+            print_table(site)
+            time.sleep(60)
+        except KeyboardInterrupt:
+            print() # this puts the prompt on the next line
+            break
+
+
+main()
+
