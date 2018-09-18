@@ -1,26 +1,28 @@
 #!/usr/bin/python3
 
-# This program displays a list of recent earthquakes.
-# Parses JSON API Endpoint from https://earthquake.usgs.gov once a minute
-# and displays the result as color coded list in the terminal.
-# Requires a terminal that supports 256 colors.
+"""
+This program displays a list of recent earthquakes.
+Parses JSON API Endpoint from https://earthquake.usgs.gov once a minute
+and displays the result as color coded list in the terminal.
+Requires a terminal that supports 256 colors.
 
-# The colors correspond to the PAGER status (https://earthquake.usgs.gov/data/pager/background.php)
-# The suggested levels of response are:
-# no response needed -> green,
-# local/regional             -> yellow,
-# national                      -> orange
-# international              -> red
+The PAGER status colors are taken from https://earthquake.usgs.gov/data/pager/background.php
+The suggested levels of response are:
+no response needed -> green,
+local/regional     -> yellow,
+national           -> orange
+international      -> red
+"""
 
-from tabulate import tabulate
 import argparse
 import datetime
 import os
-import requests
 import time
+import requests
+from tabulate import tabulate
 
-# site config
-sites = {
+# available API endpoints
+SITES = {
     # last hour
     'hour45': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_hour.geojson',
     'hour25': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_hour.geojson',
@@ -33,14 +35,14 @@ sites = {
     'all_day': 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson'
 }
 
-# returns a list of properties for one earthquake
 def get_earthquake(feature):
+    """returns a list of properties for one earthquake"""
     reset = '\033[0m'
     properties = feature['properties']
 
     # time is given in milliseconds since epoch
-    t = datetime.datetime.utcfromtimestamp(properties['time'] / 1000)
-    timestamp = t.strftime('%Y-%m-%d %H:%M:%S')
+    utctime = datetime.datetime.utcfromtimestamp(properties['time'] / 1000)
+    timestamp = utctime.strftime('%Y-%m-%d %H:%M:%S')
 
     # colorize magnitude
     magnitude = properties['mag']
@@ -65,27 +67,31 @@ def get_earthquake(feature):
     else:
         magnitude = magstr
 
-    # alert is the PAGER status
-    if properties['alert']  == 'red':
+    # alert property is the PAGER status
+    if properties['alert'] == 'red':
         alert = '\033[38;5;009m' + 'RED' + reset
-    elif properties['alert']  == 'orange':
+    elif properties['alert'] == 'orange':
         alert = '\033[38;5;208m' + 'ORANGE' + reset
-    elif properties['alert']  == 'yellow':
+    elif properties['alert'] == 'yellow':
         alert = '\033[38;5;011m' + 'YELLOW' + reset
-    elif properties['alert']  == 'green':
+    elif properties['alert'] == 'green':
         alert = '\033[38;5;046m' + 'GREEN' + reset
     else:
         alert = '-'
 
-    return [timestamp,  magnitude,  properties['place'],  alert,  properties['url']]
+    return [timestamp, magnitude, properties['place'], alert, properties['url']]
 
-# prints the table of all earthquakes
 def print_table(url):
+    """prints the table of all earthquakes"""
     req = requests.get(url)
     earthquakes = req.json()
     os.system('clear')
     print(earthquakes['metadata']['title'])
-    print(tabulate(list(map(get_earthquake,  earthquakes['features'])),  headers=['Time (UTC)',  'Mag',  'Location',  'PAGER',  'More info'],  floatfmt='.1f'))
+    print(
+        tabulate(
+            list(map(get_earthquake, earthquakes['features'])),
+            headers=['Time (UTC)', 'Mag', 'Location', 'PAGER', 'More info'],
+            floatfmt='.1f'))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -99,18 +105,18 @@ def main():
     args = parser.parse_args()
 
     if args.hour45:
-        site = sites['hour45']
+        site = SITES['hour45']
     elif args.hour25:
-        site = sites['hour25']
+        site = SITES['hour25']
     elif args.hour10:
-        site = sites['hour10']
+        site = SITES['hour10']
     elif args.day45:
-        site = sites['day45']
+        site = SITES['day45']
     elif args.day25:
-        site = sites['day25']
+        site = SITES['day25']
     elif args.day10:
-        site = sites['day10']
-    while (True):
+        site = SITES['day10']
+    while True:
         try:
             print_table(site)
             time.sleep(60)
@@ -120,4 +126,3 @@ def main():
 
 
 main()
-
